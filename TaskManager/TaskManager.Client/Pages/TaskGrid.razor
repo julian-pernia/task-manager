@@ -1,0 +1,24 @@
+﻿@using TaskManager.Client.ModelAdapter;
+@using Radzen.Blazor
+@page "/"
+
+<h3>TaskList</h3>
+
+<RadzenDataGrid Data="Tasks">
+    <RadzenDataGridColumn Context="task" Title="" Filterable="false" Sortable="false">
+        <Template>
+            <RadzenCheckBox Value=@task.IsSelected/>
+        </Template>
+    </RadzenDataGridColumn>
+    <RadzenDataGridColumn Title="Task ID" Property="@nameof(SelectableTask.Id)"/>
+    <RadzenDataGridColumn Title="Priority" Property="@nameof(SelectableTask.Priority)" />
+    <RadzenDataGridColumn Title="Description" Property="@nameof(SelectableTask.Id)" />
+    <RadzenDataGridColumn Title="Task ID" Property="@nameof(SelectableTask.Id)" />
+    <RadzenDataGridColumn Title="Task ID" Property="@nameof(SelectableTask.Id)" />
+    <RadzenDataGridColumn Title="Task ID" Property="@nameof(SelectableTask.Id)" />
+    <RadzenDataGridColumn Title="Task ID" Property="@nameof(SelectableTask.Id)" />
+</RadzenDataGrid>
+
+@code {
+    IQueryable<SelectableTask> Tasks;
+}
