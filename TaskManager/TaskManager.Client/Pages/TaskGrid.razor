@@ -1,24 +1,54 @@
-﻿@using TaskManager.Client.ModelAdapter;
+﻿@using Radzen
+@using TaskManager.Client.ModelAdapter
 @using Radzen.Blazor
+@using Status = TaskManager.Shared.Models.Status
+@using Priority = TaskManager.Shared.Models.Priority
+
+@inject NotificationService notificationService
+
 @page "/"
 
-<h3>TaskList</h3>
+<h3>Task Manager</h3>
 
-<RadzenDataGrid Data="Tasks">
-    <RadzenDataGridColumn Context="task" Title="" Filterable="false" Sortable="false">
+<RadzenDataGrid TItem="SelectableTask" Data="Tasks">
+    <RadzenDataGridColumn Title="" Context="task" Filterable="false" Sortable="false">
         <Template>
             <RadzenCheckBox Value=@task.IsSelected/>
         </Template>
     </RadzenDataGridColumn>
     <RadzenDataGridColumn Title="Task ID" Property="@nameof(SelectableTask.Id)"/>
-    <RadzenDataGridColumn Title="Priority" Property="@nameof(SelectableTask.Priority)" />
-    <RadzenDataGridColumn Title="Title" Property="@nameof(SelectableTask.Id)" />
-    <RadzenDataGridColumn Title="Description" Property="@nameof(SelectableTask.Id)" />
-    <RadzenDataGridColumn Title="Created By" Property="@nameof(SelectableTask.Id)" />
-    <RadzenDataGridColumn Title="Created On" Property="@nameof(SelectableTask.Id)" />
-    <RadzenDataGridColumn Title="Status" Property="@nameof(SelectableTask.Status)" />
+    <RadzenDataGridColumn Title="Priority" Context="task">
+        <Template>
+            <RadzenDropDown Change="@SaveChanges" TValue="Priority" Value=task.Priority Data=@Priorities/>
+        </Template>
+    </RadzenDataGridColumn>
+
+    <RadzenDataGridColumn Title="Title" Property="@nameof(SelectableTask.Title)" />
+    <RadzenDataGridColumn Title="Description" Property="@nameof(SelectableTask.Description)" />
+    <RadzenDataGridColumn Title="Created By" Property="@nameof(SelectableTask.CreatedBy)" />
+    <RadzenDataGridColumn Title="Created On" Property="@nameof(SelectableTask.CreatedOnString)" />
+    <RadzenDataGridColumn Title="Status" Context="task">
+        <Template>
+            <RadzenDropDown Change="@SaveChanges" TValue="Status" Value=task.Status Data=@Statuses/>
+        </Template>
+    </RadzenDataGridColumn>
 </RadzenDataGrid>
 
 @code {
     IQueryable<SelectableTask> Tasks;
+    readonly IEnumerable<Status> Statuses = [Status.NotStarted, Status.InProgress, Status.Done, Status.Blocked];
+    readonly IEnumerable<Priority> Priorities = [Priority.Unassigned, Priority.Low, Priority.Medium, Priority.High];
+
+    public async Task SaveChanges()
+    {
+        // TODO: Save changes to local storage
+        var message = new NotificationMessage()
+        {
+            Severity = NotificationSeverity.Info,
+            Duration = 5000,
+            Summary = "Sample",
+            Detail = "Testing Notification Service"
+        };
+        notificationService.Notify(message);
+    }
 }

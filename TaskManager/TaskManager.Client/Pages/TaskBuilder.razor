@@ -1,0 +1,76 @@
+﻿@using Radzen
+@using Radzen.Blazor
+@using Models = TaskManager.Shared.Models
+@using Status = TaskManager.Shared.Models.Status
+@using Priority = TaskManager.Shared.Models.Priority
+@using System.Text.Json
+
+@inject NotificationService notificationService
+@inject IJSRuntime javascript
+
+@page "/task"
+@page "/task/{TaskId}"
+
+<h3>Task Builder</h3>
+
+<RadzenPanel>
+    <RadzenLabel Component="TaskTitle" Text="Title"/>
+    <RadzenTextBox Name="TaskTitle" Value="@Title"/>
+
+    <RadzenLabel Component="TaskDescription" Text="Description"/>
+    <RadzenTextArea Name="TaskDescription" Value="@Description"/>
+
+    <RadzenLabel Component="TaskCreatedBy" Text="Created By"/>
+    <RadzenTextBox Name="TaskCreatedBy" Value="@CreatedBy"/>
+    
+    <RadzenLabel Component="TaskPriority" Text="Priority"/>
+    <RadzenDropDown Name="TaskPriority" Data="@Priorities" Value="@Priority"/>
+
+    <RadzenLabel Component="TaskStatus" Text="Status"/>
+    <RadzenDropDown Name="TaskStatus" Data="@Statuses" Value="@Status"/>
+
+    <RadzenButton Click="@SaveChanges">@(TaskId == null ? "Save" : "Update")</RadzenButton>
+</RadzenPanel>
+
+
+@code {
+    IEnumerable<Task> Tasks = [];
+    readonly IEnumerable<Status> Statuses = [Status.NotStarted, Status.InProgress, Status.Done, Status.Blocked];
+    readonly IEnumerable<Priority> Priorities = [Priority.Unassigned, Priority.Low, Priority.Medium, Priority.High];
+
+    [Parameter]
+    public int? TaskId { get; set; }
+
+    // Task Property Values
+    public Priority Priority = Priority.Unassigned;
+    public string Title = string.Empty;
+    public string Description = string.Empty;
+    public string CreatedBy = string.Empty;
+    public Status Status = Status.NotStarted;
+
+    protected override async Task OnInitializedAsync()
+    {
+
+    }
+
+    public async Task<bool> Validate()
+    {
+        if (string.IsNullOrWhiteSpace(Title))
+        {
+            notificationService.Notify(NotificationSeverity.Warning, "Invalid Title", "Please enter a Title", 5000);
+            return false;
+        }
+        return true;
+    }
+
+    public async Task SaveChanges()
+    {
+        if(!await Validate())
+        {
+            return;
+        }
+
+        var json = JsonSerializer.Serialize(Tasks);
+        await javascript.InvokeVoidAsync("localStorage.setItem", "TaskManagerData", json);
+    }
+}

@@ -11,7 +11,7 @@ namespace TaskManager.Client.ModelAdapter
             Id = task.Id;
             Title = task.Title;
             Description = task.Description;
-            Created = task.Created;
+            CreatedOn = task.CreatedOn;
             CreatedBy = task.CreatedBy;
             Priority = task.Priority;
             Status = task.Status;
@@ -40,6 +40,11 @@ namespace TaskManager.Client.ModelAdapter
         public string PriorityName
         {
             get => Priority.ToString();
+        }
+
+        public string CreatedOnString
+        {
+            get => CreatedOn.ToString("MM/dd/yyyy HH:mm:ss");
         }
     }
 }
