@@ -1,54 +1,81 @@
 ﻿@using Radzen
 @using TaskManager.Client.ModelAdapter
 @using Radzen.Blazor
+@using Models = TaskManager.Shared.Models
 @using Status = TaskManager.Shared.Models.Status
 @using Priority = TaskManager.Shared.Models.Priority
+@using System.Text.Json
 
+@inject NavigationManager navigation
 @inject NotificationService notificationService
+@inject IJSRuntime javascript
 
 @page "/"
 
+@rendermode InteractiveWebAssembly
+
 <h3>Task Manager</h3>
 
-<RadzenDataGrid TItem="SelectableTask" Data="Tasks">
-    <RadzenDataGridColumn Title="" Context="task" Filterable="false" Sortable="false">
-        <Template>
-            <RadzenCheckBox Value=@task.IsSelected/>
-        </Template>
-    </RadzenDataGridColumn>
-    <RadzenDataGridColumn Title="Task ID" Property="@nameof(SelectableTask.Id)"/>
-    <RadzenDataGridColumn Title="Priority" Context="task">
-        <Template>
-            <RadzenDropDown Change="@SaveChanges" TValue="Priority" Value=task.Priority Data=@Priorities/>
-        </Template>
-    </RadzenDataGridColumn>
+<RadzenPanel>
+    <RadzenDataGrid TItem="SelectableTask" Data="Tasks">
+        <RadzenDataGridColumn Title="" Context="task" Filterable="false" Sortable="false">
+            <Template>
+                <RadzenCheckBox Value=@task.IsSelected />
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn Title="Task ID" Property="@nameof(SelectableTask.Id)" />
+        <RadzenDataGridColumn Title="Priority" Context="task">
+            <Template>
+                <RadzenDropDown Change="@(_ => SaveChanges(nameof(Models.Task.Priority)))" TValue="Priority" Value=task.Priority Data=@Priorities />
+            </Template>
+        </RadzenDataGridColumn>
 
-    <RadzenDataGridColumn Title="Title" Property="@nameof(SelectableTask.Title)" />
-    <RadzenDataGridColumn Title="Description" Property="@nameof(SelectableTask.Description)" />
-    <RadzenDataGridColumn Title="Created By" Property="@nameof(SelectableTask.CreatedBy)" />
-    <RadzenDataGridColumn Title="Created On" Property="@nameof(SelectableTask.CreatedOnString)" />
-    <RadzenDataGridColumn Title="Status" Context="task">
-        <Template>
-            <RadzenDropDown Change="@SaveChanges" TValue="Status" Value=task.Status Data=@Statuses/>
-        </Template>
-    </RadzenDataGridColumn>
-</RadzenDataGrid>
+        <RadzenDataGridColumn Title="Title" Property="@nameof(SelectableTask.Title)" />
+        <RadzenDataGridColumn Title="Description" Property="@nameof(SelectableTask.Description)" />
+        <RadzenDataGridColumn Title="Created By" Property="@nameof(SelectableTask.CreatedBy)" />
+        <RadzenDataGridColumn Title="Created On" Property="@nameof(SelectableTask.CreatedOnString)" />
+        <RadzenDataGridColumn Title="Status" Context="task">
+            <Template>
+                <RadzenDropDown Change="@(_ => SaveChanges(nameof(Models.Task.Status)))" TValue="Status" Value=task.Status Data=@Statuses />
+            </Template>
+        </RadzenDataGridColumn>
+    </RadzenDataGrid>
+    <RadzenButton ButtonType="@ButtonType.Button" Click="@CreateTask">Add Task</RadzenButton>
+</RadzenPanel>
+
 
 @code {
-    IQueryable<SelectableTask> Tasks;
-    readonly IEnumerable<Status> Statuses = [Status.NotStarted, Status.InProgress, Status.Done, Status.Blocked];
-    readonly IEnumerable<Priority> Priorities = [Priority.Unassigned, Priority.Low, Priority.Medium, Priority.High];
+    readonly string TasksKeyword = "TaskManagerData";
 
-    public async Task SaveChanges()
+    List<SelectableTask> Tasks = [];
+    readonly IEnumerable<Status> Statuses = [Status.NotStarted, Status.InProgress, Status.Done, Status.Blocked];
+    readonly IEnumerable<Priority> Priorities = [Priority.Low, Priority.Medium, Priority.High];
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // TODO: Save changes to local storage
-        var message = new NotificationMessage()
+        if (firstRender)
         {
-            Severity = NotificationSeverity.Info,
-            Duration = 5000,
-            Summary = "Sample",
-            Detail = "Testing Notification Service"
-        };
-        notificationService.Notify(message);
+            bool hasProperty = await javascript.InvokeAsync<bool>("localStorage.hasOwnProperty", TasksKeyword);
+
+            if (hasProperty)
+            {
+                var json = await javascript.InvokeAsync<string>("localStorage.getItem", TasksKeyword);
+                List<Models.Task> tasks = JsonSerializer.Deserialize<List<Models.Task>>(json) ?? [];
+                Tasks = SelectableTask.ConvertToSelectable(tasks);
+            }
+        }
+    }
+
+    public async Task SaveChanges(string property)
+    {
+        var json = JsonSerializer.Serialize(Tasks);
+        await javascript.InvokeVoidAsync("localStorage.setItem", TasksKeyword, json);
+
+        notificationService.Notify(NotificationSeverity.Info, "Task Saved", $"Task {property} has been updated.", 3000);
+    }
+
+    public void CreateTask()
+    {
+        navigation.NavigateTo("/task");
     }
 }

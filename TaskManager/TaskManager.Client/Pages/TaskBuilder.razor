@@ -5,11 +5,14 @@
 @using Priority = TaskManager.Shared.Models.Priority
 @using System.Text.Json
 
+@inject NavigationManager navigation
 @inject NotificationService notificationService
 @inject IJSRuntime javascript
 
 @page "/task"
 @page "/task/{TaskId}"
+
+@rendermode InteractiveWebAssembly
 
 <h3>Task Builder</h3>
 
@@ -24,17 +27,19 @@
     <RadzenTextBox Name="TaskCreatedBy" Value="@CreatedBy"/>
     
     <RadzenLabel Component="TaskPriority" Text="Priority"/>
-    <RadzenDropDown Name="TaskPriority" Data="@Priorities" Value="@Priority"/>
+    <RadzenDropDown Name="TaskPriority" TValue="@Priority" Data="@Priorities" Value="@Priority"/>
 
     <RadzenLabel Component="TaskStatus" Text="Status"/>
-    <RadzenDropDown Name="TaskStatus" Data="@Statuses" Value="@Status"/>
+    <RadzenDropDown Name="TaskStatus" TValue="@Status" Data="@Statuses" Value="@Status"/>
 
     <RadzenButton Click="@SaveChanges">@(TaskId == null ? "Save" : "Update")</RadzenButton>
 </RadzenPanel>
 
 
 @code {
-    IEnumerable<Task> Tasks = [];
+    readonly string TasksKeyword = "TaskManagerData";
+
+    List<Models.Task> Tasks = [];
     readonly IEnumerable<Status> Statuses = [Status.NotStarted, Status.InProgress, Status.Done, Status.Blocked];
     readonly IEnumerable<Priority> Priorities = [Priority.Unassigned, Priority.Low, Priority.Medium, Priority.High];
 
@@ -48,16 +53,40 @@
     public string CreatedBy = string.Empty;
     public Status Status = Status.NotStarted;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender)
+        {
+            bool hasProperty = await javascript.InvokeAsync<bool>("localStorage.hasOwnProperty", TasksKeyword);
 
+            if (hasProperty)
+            {
+                var json = await javascript.InvokeAsync<string>("localStorage.getItem", TasksKeyword);
+                Tasks = JsonSerializer.Deserialize<List<Models.Task>>(json) ?? [];
+            }
+
+            if (TaskId != null && Tasks.Any(task => task.Id == TaskId))
+            {
+                Models.Task existing = Tasks.First(task => task.Id == TaskId);
+
+                Priority = existing.Priority;
+                Title = existing.Title;
+                Description = existing.Description;
+                CreatedBy = existing.CreatedBy;
+            }
+        }
     }
 
-    public async Task<bool> Validate()
+    public bool Validate()
     {
         if (string.IsNullOrWhiteSpace(Title))
         {
-            notificationService.Notify(NotificationSeverity.Warning, "Invalid Title", "Please enter a Title", 5000);
+            notificationService.Notify(NotificationSeverity.Warning, "Invalid Title", "Please enter a Title.", 5000);
+            return false;
+        }
+        if (Priority == Priority.Unassigned)
+        {
+            notificationService.Notify(NotificationSeverity.Warning, "Invalid Priority", "Please assign a Priority.", 5000);
             return false;
         }
         return true;
@@ -65,12 +94,56 @@
 
     public async Task SaveChanges()
     {
-        if(!await Validate())
+        try
         {
-            return;
+            if (!Validate())
+            {
+                return;
+            }
+
+            if (TaskId != null && Tasks.Any(task => task.Id == TaskId))
+            {
+                Models.Task existing = Tasks.First(task => task.Id == TaskId);
+                int index = Tasks.IndexOf(existing);
+                Tasks[index] = new()
+                    {
+                        Id = TaskId.Value,
+                        Title = Title,
+                        Description = Description,
+                        Priority = Priority,
+                        Status = Status,
+                        CreatedBy = existing.CreatedBy,
+                        CreatedOn = existing.CreatedOn
+                    };
+            }
+            else
+            {
+                Models.Task added = new()
+                    {
+                        Id = Tasks.Select(task => task.Id).DefaultIfEmpty(0).Max() + 1,
+                        Title = Title,
+                        Description = Description,
+                        Priority = Priority,
+                        Status = Status,
+                        CreatedBy = CreatedBy,
+                        CreatedOn = DateTime.Now
+                    };
+                Tasks.Add(added);
+
+                TaskId = added.Id;
+            }
+
+            var json = JsonSerializer.Serialize(Tasks);
+            await javascript.InvokeVoidAsync("localStorage.setItem", TasksKeyword, json);
+
+            notificationService.Notify(NotificationSeverity.Success, "Task Saved", $"Task \"{Title}\" has been saved successfully.");
+
+            navigation.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            notificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to save task. Error message: {ex.Message}");
         }
 
-        var json = JsonSerializer.Serialize(Tasks);
-        await javascript.InvokeVoidAsync("localStorage.setItem", "TaskManagerData", json);
     }
 }
