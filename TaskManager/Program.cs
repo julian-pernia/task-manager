@@ -9,6 +9,9 @@ builder.Services.AddRazorComponents()
 
 builder.Services.AddScoped<NotificationService>();
 builder.Services.AddScoped<DialogService>();
+builder.Services.AddScoped<ThemeService>();
+builder.Services.AddScoped<ContextMenuService>();
+builder.Services.AddScoped<TooltipService>();
 
 var app = builder.Build();
 
