@@ -1,0 +1,250 @@
+﻿@using TaskManager.Components.ModelAdapter
+@using TaskManager.Models
+@using Status = TaskManager.Models.Status
+@using Priority = TaskManager.Models.Priority
+@using System.Text.Json
+
+@attribute [StreamRendering]
+
+@inject NavigationManager navigation
+@inject NotificationService notification
+@inject DialogService dialog
+@inject TooltipService tooltip
+@inject IJSRuntime javascript
+
+@page "/"
+
+@rendermode InteractiveServer
+
+<h3>Tasks</h3>
+
+<RadzenStack Orientation="Orientation.Vertical">
+    <RadzenPanel AllowCollapse="true" Collapsed="true">
+        <HeaderTemplate>
+            <RadzenText>Task Filters</RadzenText>
+        </HeaderTemplate>
+        <ChildContent>
+            <RadzenStack Orientation="Orientation.Vertical">
+                <RadzenStack Orientation="Orientation.Horizontal">
+                    <RadzenLabel Component="TaskId" Text="Id" MouseEnter="@(args => OnHover(args, "Numeric ID of the task"))" />
+                    <RadzenTextBox Name="TaskId" Change=@(args => IdFilter = args) Value="@IdFilter" />
+
+                    <RadzenLabel Component="TaskTitle" Text="Title" MouseEnter="@(args => OnHover(args, "Display name of the task"))" />
+                    <RadzenTextBox Name="TaskTitle" Change=@(args => TitleFilter = args) Value="@TitleFilter" />
+
+                    <RadzenLabel Component="TaskDescription" Text="Description" MouseEnter="@(args => OnHover(args, "Information and details of the task"))" />
+                    <RadzenTextBox Name="TaskDescription" Change=@(args => DescriptionFilter = args) Value="@DescriptionFilter" />
+
+                    <RadzenLabel Component="TaskCreatedBy" Text="Created By" MouseEnter="@(args => OnHover(args, "Name of the user who is creating the task"))" />
+                    <RadzenTextBox Name="TaskCreatedBy" Change=@(args => CreatedByFilter = args) Value="@CreatedByFilter" />
+                </RadzenStack>
+                <RadzenStack Orientation="Orientation.Horizontal">
+                    <RadzenLabel Component="TaskPriority" Text="Priority" MouseEnter="@(args => OnHover(args, "Relative importance of the task"))" />
+                    <RadzenDropDown @ref="PriorityDropdown" Name="TaskPriority" TValue="@Priority" Data="@Priorities" Change=@(args => PriorityFilter = args as Priority?) Value="@PriorityFilter" />
+
+                    <RadzenLabel Component="TaskStatus" Text="Status" MouseEnter="@(args => OnHover(args, "Current work progress label for the task"))" />
+                    <RadzenDropDown @ref="StatusDropdown" Name="TaskStatus" TValue="@Status" Data="@Statuses" Change=@(args => StatusFilter = args as Status?) Value="@StatusFilter" />
+                </RadzenStack>
+                <RadzenStack Orientation="Orientation.Horizontal">
+                    <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@ApplyFilters">Apply Filters</RadzenButton>
+                    <RadzenButton ButtonStyle="ButtonStyle.Secondary" Click="@ClearFilters">Clear Filters</RadzenButton>
+                </RadzenStack>
+            </RadzenStack>
+
+        </ChildContent>
+    </RadzenPanel>
+
+    <RadzenDataGrid TItem="SelectableTask" Data="FilteredTasks" AllowColumnResize="true" AllowSorting="true" GridLines="DataGridGridLines.Vertical">
+        <Columns>
+            <RadzenDataGridColumn Title="" Context="task" Filterable="false" Sortable="false" Width="50px">
+                <Template>
+                    <RadzenCheckBox TValue="bool" Value=@task.IsSelected Change="(args => UpdateSelected(args, task))" />
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn Title="Actions" Context="task" Filterable="false" Sortable="false" Width="250px">
+                <Template>
+                    <RadzenButton ButtonStyle="ButtonStyle.Secondary" Click="@(_ => EditTask(task.Id))" Style="width:50%">Edit</RadzenButton>
+                    <RadzenButton ButtonStyle="ButtonStyle.Danger" Click="@(_ => DeleteTask(task.Id))" Style="width:50%">Delete</RadzenButton>
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn Title="Task ID" Property="@nameof(SelectableTask.Id)" Width="100px" MinWidth="100px"/>
+
+            <RadzenDataGridColumn Title="Priority" Context="task" MinWidth="200px" SortProperty="@nameof(SelectableTask.Priority)">
+                <Template>
+                    <RadzenDropDown Change="@(args => SetPriority((Priority)args, task))" TValue="Priority" Value=task.Priority Data=@Priorities Style="width:100%" />
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn Title="Title" Property="@nameof(SelectableTask.Title)" MinWidth="100px" />
+            <RadzenDataGridColumn Title="Description" Property="@nameof(SelectableTask.Description)" MinWidth="100px" />
+            <RadzenDataGridColumn Title="Created By" Property="@nameof(SelectableTask.CreatedBy)" MinWidth="100px" />
+            <RadzenDataGridColumn Title="Created On" Property="@nameof(SelectableTask.CreatedOnString)" SortProperty="@nameof(SelectableTask.CreatedOn)" MinWidth="100px" />
+
+            <RadzenDataGridColumn Title="Status" Context="task" MinWidth="300px" SortProperty="@nameof(SelectableTask.Status)">
+                <Template>
+                    <RadzenDropDown Change="@(args => SetStatus((Status)args, task))" TValue="Status" Value=task.Status Data=@Statuses Style="width:100%" />
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+
+    <RadzenStack Orientation="Orientation.Horizontal">
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@CreateTask">Create Task</RadzenButton>
+        <RadzenButton ButtonStyle="ButtonStyle.Danger" Click="@DeleteTasks">Delete Tasks</RadzenButton>
+    </RadzenStack>
+
+</RadzenStack>
+
+
+
+@code {
+    readonly string TasksKeyword = "TaskManagerData";
+
+    List<SelectableTask> Tasks = [];
+    List<SelectableTask> FilteredTasks = [];
+    readonly List<Status?> Statuses = [null, Status.NotStarted, Status.InProgress, Status.Done, Status.Blocked];
+    readonly List<Priority?> Priorities = [null, Priority.Low, Priority.Medium, Priority.High];
+
+    bool AnySelected = false;
+
+    [Parameter]
+    public int? TaskId { get; set; }
+
+    // Task Search Values
+    public string IdFilter { get; set; } = string.Empty;
+    public Priority? PriorityFilter { get; set; }
+    public string TitleFilter { get; set; } = string.Empty;
+    public string DescriptionFilter { get; set; } = string.Empty;
+    public string CreatedByFilter { get; set; } = string.Empty;
+    public Status? StatusFilter { get; set; }
+
+    RadzenDropDown<Priority> PriorityDropdown;
+    RadzenDropDown<Status> StatusDropdown;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            bool hasProperty = await javascript.InvokeAsync<bool>("localStorage.hasOwnProperty", TasksKeyword);
+
+            if (hasProperty)
+            {
+                var json = await javascript.InvokeAsync<string>("localStorage.getItem", TasksKeyword);
+                List<TaskTicket> tasks = JsonSerializer.Deserialize<List<TaskTicket>>(json) ?? [];
+                Tasks = SelectableTask.ConvertToSelectable(tasks);
+                FilteredTasks = new(Tasks);
+
+                StateHasChanged();
+            }
+        }
+    }
+
+    public void UpdateSelected(bool selected, SelectableTask task)
+    {
+        task.IsSelected = selected;
+    }
+
+    public async Task SetPriority(Priority priority, SelectableTask task)
+    {
+        Tasks.Where(t => t.Id == task.Id).First().Priority = priority;
+        await SaveChanges();
+
+        notification.Notify(NotificationSeverity.Info, "Task Saved", $"Task priority has been updated.", 3000);
+    }
+
+    public async Task SetStatus(Status status, SelectableTask task)
+    {
+        Tasks.Where(t => t.Id == task.Id).First().Status = status;
+        await SaveChanges();
+        notification.Notify(NotificationSeverity.Info, "Task Saved", $"Task info has been updated.", 3000);
+    }
+
+    public async Task SaveChanges()
+    {
+        Tasks = new(Tasks); // Assign new value to get datagrid to refresh
+        var json = JsonSerializer.Serialize(Tasks);
+        await javascript.InvokeVoidAsync("localStorage.setItem", TasksKeyword, json);
+        StateHasChanged();
+    }
+
+    public void ApplyFilters()
+    {
+        Tasks.ForEach(task => task.IsSelected = false);
+
+        List<SelectableTask> filtered = Tasks.Where(task =>
+            (string.IsNullOrEmpty(IdFilter) || task.Id.ToString().Contains(IdFilter)) &&
+            (string.IsNullOrEmpty(TitleFilter) || task.Title.Contains(TitleFilter, StringComparison.CurrentCultureIgnoreCase)) &&
+            (string.IsNullOrEmpty(DescriptionFilter) || task.Title.Contains(DescriptionFilter, StringComparison.CurrentCultureIgnoreCase)) &&
+            (string.IsNullOrEmpty(CreatedByFilter) || task.Title.Contains(CreatedByFilter, StringComparison.CurrentCultureIgnoreCase)) &&
+            (PriorityFilter == null || task.Priority == PriorityFilter) &&
+            (StatusFilter == null || task.Status == StatusFilter)
+        ).ToList();
+
+        FilteredTasks = new(filtered);
+    }
+
+    public void ClearFilters()
+    {
+        Tasks.ForEach(task => task.IsSelected = false);
+
+        IdFilter = string.Empty;
+        PriorityFilter = null;
+        TitleFilter = string.Empty;
+        DescriptionFilter = string.Empty;
+        CreatedByFilter = string.Empty;
+        StatusFilter = null;
+
+        FilteredTasks = new(Tasks);
+
+        StateHasChanged();
+    }
+
+    public void CreateTask()
+    {
+        navigation.NavigateTo("/task");
+    }
+
+    public void EditTask(int taskId)
+    {
+        navigation.NavigateTo($"/task/{taskId}");
+    }
+
+    public async Task DeleteTask(int taskId)
+    {
+        SelectableTask deleting = Tasks.First(task => task.Id == taskId);
+        bool? response = await dialog.Confirm($"Are you sure you want to delete \"{deleting.Title}\" (Task ID {taskId})? This cannot be undone.", "Delete Tasks");
+
+        if (response.HasValue && response.Value)
+        {
+            Tasks.Remove(deleting);
+
+            ApplyFilters();
+            await SaveChanges();
+            notification.Notify(NotificationSeverity.Success, "Task Deleted", $"Task has been deleted.", 3000);
+        }
+    }
+
+    public async Task DeleteTasks()
+    {
+        if (!Tasks.Any(task => task.IsSelected))
+        {
+            notification.Notify(NotificationSeverity.Info, "No Tasks Selected", $"Click the checkbox on the left side of the task grid to use the bulk delete feature.", 5000);
+            return;
+        }
+
+        bool? response = await dialog.Confirm("Are you sure you want to delete the selected task tickets? This cannot be undone.", "Delete Tasks");
+
+        if (response.HasValue && response.Value)
+        {
+            Tasks.RemoveAll(task => task.IsSelected);
+
+            ApplyFilters();
+            await SaveChanges();
+            notification.Notify(NotificationSeverity.Success, "Tasks Deleted", $"Tasks have been deleted.", 3000);
+        }
+    }
+
+    public void OnHover(ElementReference element, string text) => tooltip.Open(element, text, new TooltipOptions() { Duration = 5000 });
+}

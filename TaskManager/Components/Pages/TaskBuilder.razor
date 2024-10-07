@@ -1,0 +1,156 @@
+﻿@using TaskManager.Models
+@using Status = TaskManager.Models.Status
+@using Priority = TaskManager.Models.Priority
+@using System.Text.Json
+
+@attribute [StreamRendering]
+
+@inject NavigationManager navigation
+@inject NotificationService notification
+@inject TooltipService tooltip
+@inject IJSRuntime javascript
+
+@page "/task"
+@page "/task/{TaskId:int}"
+
+@rendermode InteractiveServer
+
+<h3>Create Task</h3>
+
+<RadzenStack Orientation="Orientation.Vertical" Style="max-width:80%">
+    <RadzenLabel Component="TaskTitle" Text="Title" MouseEnter="@(args => OnHover(args, "Display name of the task"))"/>
+    <RadzenTextBox Name="TaskTitle" Change=@(args => Title = args) Value="@Title"/>
+
+    <RadzenLabel Component="TaskDescription" Text="Description" MouseEnter="@(args => OnHover(args, "Information and details of the task"))" />
+    <RadzenTextArea Name="TaskDescription" Change=@(args => Description = args) Value="@Description"/>
+
+    <RadzenLabel Component="TaskCreatedBy" Text="Created By" MouseEnter="@(args => OnHover(args, "Name of the user who is creating the task"))" />
+    <RadzenTextBox Name="TaskCreatedBy" Change=@(args => CreatedBy = args) Value="@CreatedBy" Disabled="@(TaskId != null)"/>
+
+    <RadzenLabel Component="TaskPriority" Text="Priority" MouseEnter="@(args => OnHover(args, "Relative importance of the task"))" />
+    <RadzenDropDown Name="TaskPriority" TValue="@Priority" Data="@Priorities" Change=@(args => Priority = (Priority)args) Value=@Priority />
+
+    <RadzenLabel Component="TaskStatus" Text="Status" MouseEnter="@(args => OnHover(args, "Current work progress label for the task"))" />
+    <RadzenDropDown Name="TaskStatus" TValue="@Status" Data="@Statuses" Change=@(args => Status = (Status)args) Value=@Status />
+
+    <RadzenButton Click="@SaveChanges">@(TaskId == null ? "Save" : "Update")</RadzenButton>
+</RadzenStack>
+
+
+@code {
+    readonly string TasksKeyword = "TaskManagerData";
+
+    List<TaskTicket> Tasks = [];
+    readonly IEnumerable<Status> Statuses = [Status.NotStarted, Status.InProgress, Status.Done, Status.Blocked];
+    readonly IEnumerable<Priority> Priorities = [Priority.Unassigned, Priority.Low, Priority.Medium, Priority.High];
+
+    [Parameter]
+    public int? TaskId { get; set; }
+
+    // Task Property Values
+    public Priority Priority { get; set; } = Priority.Unassigned;
+    public string Title { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string CreatedBy { get; set; } = string.Empty;
+    public Status Status { get; set; } = Status.NotStarted;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            bool hasProperty = await javascript.InvokeAsync<bool>("localStorage.hasOwnProperty", TasksKeyword);
+
+            if (hasProperty)
+            {
+                var json = await javascript.InvokeAsync<string>("localStorage.getItem", TasksKeyword);
+                Tasks = JsonSerializer.Deserialize<List<TaskTicket>>(json) ?? [];
+            }
+
+            if (TaskId != null && Tasks.Any(task => task.Id == TaskId))
+            {
+                TaskTicket existing = Tasks.First(task => task.Id == TaskId);
+
+                Priority = existing.Priority;
+                Title = existing.Title;
+                Description = existing.Description;
+                CreatedBy = existing.CreatedBy;
+                Status = existing.Status;
+
+                StateHasChanged();
+            }
+        }
+    }
+
+    public bool Validate()
+    {
+        bool valid = true;
+        if (string.IsNullOrWhiteSpace(Title))
+        {
+            notification.Notify(NotificationSeverity.Warning, "Invalid Title", "Please enter a Title.", 5000);
+            valid = false;
+        }
+        if (Priority == Priority.Unassigned)
+        {
+            notification.Notify(NotificationSeverity.Warning, "Invalid Priority", "Please assign a Priority.", 5000);
+            valid = false;
+        }
+        return valid;
+    }
+
+    public async Task SaveChanges()
+    {
+        try
+        {
+            if (!Validate())
+            {
+                return;
+            }
+
+            if (TaskId != null && Tasks.Any(task => task.Id == TaskId))
+            {
+                TaskTicket existing = Tasks.First(task => task.Id == TaskId);
+                int index = Tasks.IndexOf(existing);
+                Tasks[index] = new()
+                {
+                    Id = TaskId.Value,
+                    Title = Title,
+                    Description = Description,
+                    Priority = Priority,
+                    Status = Status,
+                    CreatedBy = existing.CreatedBy,
+                    CreatedOn = existing.CreatedOn
+                };
+            }
+            else
+            {
+                TaskTicket added = new()
+                {
+                    Id = Tasks.Select(task => task.Id).DefaultIfEmpty(0).Max() + 1,
+                    Title = Title,
+                    Description = Description,
+                    Priority = Priority,
+                    Status = Status,
+                    CreatedBy = CreatedBy,
+                    CreatedOn = DateTime.Now
+                };
+                Tasks.Add(added);
+
+                TaskId = added.Id;
+            }
+
+            var json = JsonSerializer.Serialize(Tasks);
+            await javascript.InvokeVoidAsync("localStorage.setItem", TasksKeyword, json);
+
+            notification.Notify(NotificationSeverity.Success, "Task Saved", $"Task \"{Title}\" has been saved successfully.");
+
+            navigation.NavigateTo("/");
+        }
+        catch (Exception ex)
+        {
+            notification.Notify(NotificationSeverity.Error, "Error", $"Failed to save task. Error message: {ex.Message}");
+        }
+
+    }
+
+    public void OnHover(ElementReference element, string text) => tooltip.Open(element, text, new TooltipOptions() { Duration = 5000 });
+}
