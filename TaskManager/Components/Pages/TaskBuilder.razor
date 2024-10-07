@@ -12,9 +12,11 @@
 @page "/task"
 @page "/task/{TaskId}"
 
+@rendermode InteractiveServer
+
 <h3>Task Builder</h3>
 
-<RadzenPanel>
+<RadzenStack Orientation="Orientation.Vertical">
     <RadzenLabel Component="TaskTitle" Text="Title" />
     <RadzenTextBox Name="TaskTitle" Value="@Title" />
 
@@ -31,7 +33,7 @@
     <RadzenDropDown Name="TaskStatus" TValue="@Status" Data="@Statuses" Value="@Status" />
 
     <RadzenButton Click="@SaveChanges">@(TaskId == null ? "Save" : "Update")</RadzenButton>
-</RadzenPanel>
+</RadzenStack>
 
 
 @code {
