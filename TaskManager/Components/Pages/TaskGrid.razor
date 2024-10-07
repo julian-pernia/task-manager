@@ -7,7 +7,8 @@
 @attribute [StreamRendering]
 
 @inject NavigationManager navigation
-@inject NotificationService notificationService
+@inject NotificationService notification
+@inject DialogService dialog 
 @inject IJSRuntime javascript
 
 @page "/"
@@ -17,11 +18,11 @@
 <h3>Tasks</h3>
 
 <RadzenPanel>
-    <RadzenDataGrid TItem="SelectableTask" Data="Tasks">
+    <RadzenDataGrid TItem="SelectableTask" Data="Tasks" AllowColumnResize="true" GridLines="DataGridGridLines.Vertical">
         <Columns>
-            <RadzenDataGridColumn Title="" Context="task" Filterable="false" Sortable="false">
+            <RadzenDataGridColumn Title="" Context="task" Filterable="false" Sortable="false" Width="50px">
                 <Template>
-                    <RadzenCheckBox Value=@task.IsSelected />
+                    <RadzenCheckBox TValue="bool" Value=@task.IsSelected Change="(args => UpdateSelected(args, task))" />
                 </Template>
             </RadzenDataGridColumn>
 
@@ -29,7 +30,7 @@
 
             <RadzenDataGridColumn Title="Priority" Context="task">
                 <Template>
-                    <RadzenDropDown Change="@(_ => SaveChanges(nameof(TaskTicket.Priority)))" TValue="Priority" Value=task.Priority Data=@Priorities />
+                    <RadzenDropDown Change="@(args => SetPriority((Priority)args, task))" TValue="Priority" Value=task.Priority Data=@Priorities Style="width:100%"/>
                 </Template>
             </RadzenDataGridColumn>
 
@@ -40,12 +41,15 @@
 
             <RadzenDataGridColumn Title="Status" Context="task">
                 <Template>
-                    <RadzenDropDown Change="@(_ => SaveChanges(nameof(TaskTicket.Status)))" TValue="Status" Value=task.Status Data=@Statuses />
+                    <RadzenDropDown Change="@(args => SetStatus((Status)args, task))" TValue="Status" Value=task.Status Data=@Statuses Style="width:100%"/>
                 </Template>
             </RadzenDataGridColumn>
         </Columns>
     </RadzenDataGrid>
-    <RadzenButton ButtonType="@ButtonType.Button" Click="@CreateTask">Add Task</RadzenButton>
+    <RadzenStack Orientation="Orientation.Horizontal">
+        <RadzenButton ButtonType="@ButtonType.Button" Click="@CreateTask">Add Task</RadzenButton>
+        <RadzenButton ButtonType="@ButtonType.Button" Click="@DeleteTasks">Delete Tasks</RadzenButton>
+    </RadzenStack>
 </RadzenPanel>
 
 
@@ -55,6 +59,8 @@
     List<SelectableTask> Tasks = [];
     readonly IEnumerable<Status> Statuses = [Status.NotStarted, Status.InProgress, Status.Done, Status.Blocked];
     readonly IEnumerable<Priority> Priorities = [Priority.Low, Priority.Medium, Priority.High];
+
+    bool AnySelected = false;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -73,16 +79,55 @@
         }
     }
 
-    public async Task SaveChanges(string property)
+    public void UpdateSelected(bool selected, SelectableTask task)
+    {
+        task.IsSelected = selected;
+    }
+
+    public async Task SetPriority(Priority priority, SelectableTask task)
+    {
+        Tasks.Where(t => t.Id == task.Id).First().Priority = priority;
+        await SaveChanges();
+
+        notification.Notify(NotificationSeverity.Info, "Task Saved", $"Task priority has been updated.", 3000);
+    }
+
+    public async Task SetStatus(Status status, SelectableTask task)
+    {
+        Tasks.Where(t => t.Id == task.Id).First().Status = status;
+        await SaveChanges();
+        notification.Notify(NotificationSeverity.Info, "Task Saved", $"Task info has been updated.", 3000);
+    }
+
+    public async Task SaveChanges()
     {
         var json = JsonSerializer.Serialize(Tasks);
         await javascript.InvokeVoidAsync("localStorage.setItem", TasksKeyword, json);
 
-        notificationService.Notify(NotificationSeverity.Info, "Task Saved", $"Task {property} has been updated.", 3000);
     }
 
     public void CreateTask()
     {
         navigation.NavigateTo("/task");
+    }
+
+    public async Task DeleteTasks()
+    {
+        if (!Tasks.Any(task => task.IsSelected))
+        {
+            return;
+        }
+
+        bool? response = await dialog.Confirm("Are you sure you want to delete the selected task tickets? This cannot be undone.", "Delete Tasks");
+
+        if (response.HasValue && response.Value)
+        {
+            Tasks.RemoveAll(task => task.IsSelected);
+            Tasks = new(Tasks); // Assign new value to get datagrid to refresh
+
+            await SaveChanges();
+            notification.Notify(NotificationSeverity.Success, "Tasks Deleted", $"Tasks have been deleted.", 3000);
+            StateHasChanged();
+        }
     }
 }
