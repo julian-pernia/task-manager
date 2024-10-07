@@ -4,9 +4,9 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace TaskManager.Shared.Models
+namespace TaskManager.Models
 {
-    public class Task
+    public class TaskTicket
     {
         public int Id { get; set; }
         public string Title { get; set; } = string.Empty;

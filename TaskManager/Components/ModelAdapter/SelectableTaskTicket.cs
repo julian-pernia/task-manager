@@ -1,12 +1,10 @@
-﻿using Task = TaskManager.Shared.Models.Task;
-using Status = TaskManager.Shared.Models.Status;
-using Priority = TaskManager.Shared.Models.Priority;
+﻿using TaskManager.Models;
 
-namespace TaskManager.Client.ModelAdapter
+namespace TaskManager.Components.ModelAdapter
 {
-    public class SelectableTask : Task
+    public class SelectableTask : TaskTicket
     {
-        public SelectableTask(Task task)
+        public SelectableTask(TaskTicket task)
         {
             Id = task.Id;
             Title = task.Title;
@@ -20,7 +18,7 @@ namespace TaskManager.Client.ModelAdapter
         }
         public bool IsSelected { get; set; } = false;
 
-        public static List<SelectableTask> ConvertToSelectable(IEnumerable<Task> tasks)
+        public static List<SelectableTask> ConvertToSelectable(IEnumerable<TaskTicket> tasks)
         {
             return tasks.Select(task => new SelectableTask(task)).ToList();
         }

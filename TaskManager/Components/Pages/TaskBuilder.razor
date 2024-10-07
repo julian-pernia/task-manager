@@ -1,9 +1,11 @@
 ﻿@using Radzen
 @using Radzen.Blazor
-@using Models = TaskManager.Shared.Models
-@using Status = TaskManager.Shared.Models.Status
-@using Priority = TaskManager.Shared.Models.Priority
+@using TaskManager.Models
+@using Status = TaskManager.Models.Status
+@using Priority = TaskManager.Models.Priority
 @using System.Text.Json
+
+@attribute [StreamRendering]
 
 @inject NavigationManager navigation
 @inject NotificationService notificationService
@@ -11,26 +13,25 @@
 
 @page "/task"
 @page "/task/{TaskId}"
-
-@rendermode InteractiveWebAssembly
+@rendermode InteractiveServer
 
 <h3>Task Builder</h3>
 
 <RadzenPanel>
-    <RadzenLabel Component="TaskTitle" Text="Title"/>
-    <RadzenTextBox Name="TaskTitle" Value="@Title"/>
+    <RadzenLabel Component="TaskTitle" Text="Title" />
+    <RadzenTextBox Name="TaskTitle" Value="@Title" />
 
-    <RadzenLabel Component="TaskDescription" Text="Description"/>
-    <RadzenTextArea Name="TaskDescription" Value="@Description"/>
+    <RadzenLabel Component="TaskDescription" Text="Description" />
+    <RadzenTextArea Name="TaskDescription" Value="@Description" />
 
-    <RadzenLabel Component="TaskCreatedBy" Text="Created By"/>
-    <RadzenTextBox Name="TaskCreatedBy" Value="@CreatedBy"/>
-    
-    <RadzenLabel Component="TaskPriority" Text="Priority"/>
-    <RadzenDropDown Name="TaskPriority" TValue="@Priority" Data="@Priorities" Value="@Priority"/>
+    <RadzenLabel Component="TaskCreatedBy" Text="Created By" />
+    <RadzenTextBox Name="TaskCreatedBy" Value="@CreatedBy" />
 
-    <RadzenLabel Component="TaskStatus" Text="Status"/>
-    <RadzenDropDown Name="TaskStatus" TValue="@Status" Data="@Statuses" Value="@Status"/>
+    <RadzenLabel Component="TaskPriority" Text="Priority" />
+    <RadzenDropDown Name="TaskPriority" TValue="@Priority" Data="@Priorities" Value="@Priority" />
+
+    <RadzenLabel Component="TaskStatus" Text="Status" />
+    <RadzenDropDown Name="TaskStatus" TValue="@Status" Data="@Statuses" Value="@Status" />
 
     <RadzenButton Click="@SaveChanges">@(TaskId == null ? "Save" : "Update")</RadzenButton>
 </RadzenPanel>
@@ -39,7 +40,7 @@
 @code {
     readonly string TasksKeyword = "TaskManagerData";
 
-    List<Models.Task> Tasks = [];
+    List<TaskTicket> Tasks = [];
     readonly IEnumerable<Status> Statuses = [Status.NotStarted, Status.InProgress, Status.Done, Status.Blocked];
     readonly IEnumerable<Priority> Priorities = [Priority.Unassigned, Priority.Low, Priority.Medium, Priority.High];
 
@@ -62,12 +63,12 @@
             if (hasProperty)
             {
                 var json = await javascript.InvokeAsync<string>("localStorage.getItem", TasksKeyword);
-                Tasks = JsonSerializer.Deserialize<List<Models.Task>>(json) ?? [];
+                Tasks = JsonSerializer.Deserialize<List<TaskTicket>>(json) ?? [];
             }
 
             if (TaskId != null && Tasks.Any(task => task.Id == TaskId))
             {
-                Models.Task existing = Tasks.First(task => task.Id == TaskId);
+                TaskTicket existing = Tasks.First(task => task.Id == TaskId);
 
                 Priority = existing.Priority;
                 Title = existing.Title;
@@ -103,31 +104,31 @@
 
             if (TaskId != null && Tasks.Any(task => task.Id == TaskId))
             {
-                Models.Task existing = Tasks.First(task => task.Id == TaskId);
+                TaskTicket existing = Tasks.First(task => task.Id == TaskId);
                 int index = Tasks.IndexOf(existing);
                 Tasks[index] = new()
-                    {
-                        Id = TaskId.Value,
-                        Title = Title,
-                        Description = Description,
-                        Priority = Priority,
-                        Status = Status,
-                        CreatedBy = existing.CreatedBy,
-                        CreatedOn = existing.CreatedOn
-                    };
+                {
+                    Id = TaskId.Value,
+                    Title = Title,
+                    Description = Description,
+                    Priority = Priority,
+                    Status = Status,
+                    CreatedBy = existing.CreatedBy,
+                    CreatedOn = existing.CreatedOn
+                };
             }
             else
             {
-                Models.Task added = new()
-                    {
-                        Id = Tasks.Select(task => task.Id).DefaultIfEmpty(0).Max() + 1,
-                        Title = Title,
-                        Description = Description,
-                        Priority = Priority,
-                        Status = Status,
-                        CreatedBy = CreatedBy,
-                        CreatedOn = DateTime.Now
-                    };
+                TaskTicket added = new()
+                {
+                    Id = Tasks.Select(task => task.Id).DefaultIfEmpty(0).Max() + 1,
+                    Title = Title,
+                    Description = Description,
+                    Priority = Priority,
+                    Status = Status,
+                    CreatedBy = CreatedBy,
+                    CreatedOn = DateTime.Now
+                };
                 Tasks.Add(added);
 
                 TaskId = added.Id;

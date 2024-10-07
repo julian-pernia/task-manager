@@ -1,18 +1,19 @@
-﻿@using Radzen
-@using TaskManager.Client.ModelAdapter
+﻿﻿@using Radzen
+@using TaskManager.Components.ModelAdapter
 @using Radzen.Blazor
-@using Models = TaskManager.Shared.Models
-@using Status = TaskManager.Shared.Models.Status
-@using Priority = TaskManager.Shared.Models.Priority
+@using TaskManager.Models
+@using Status = TaskManager.Models.Status
+@using Priority = TaskManager.Models.Priority
 @using System.Text.Json
+
+@attribute [StreamRendering]
 
 @inject NavigationManager navigation
 @inject NotificationService notificationService
 @inject IJSRuntime javascript
 
 @page "/"
-
-@rendermode InteractiveWebAssembly
+@rendermode InteractiveServer
 
 <h3>Task Manager</h3>
 
@@ -26,7 +27,7 @@
         <RadzenDataGridColumn Title="Task ID" Property="@nameof(SelectableTask.Id)" />
         <RadzenDataGridColumn Title="Priority" Context="task">
             <Template>
-                <RadzenDropDown Change="@(_ => SaveChanges(nameof(Models.Task.Priority)))" TValue="Priority" Value=task.Priority Data=@Priorities />
+                <RadzenDropDown Change="@(_ => SaveChanges(nameof(TaskTicket.Priority)))" TValue="Priority" Value=task.Priority Data=@Priorities />
             </Template>
         </RadzenDataGridColumn>
 
@@ -36,7 +37,7 @@
         <RadzenDataGridColumn Title="Created On" Property="@nameof(SelectableTask.CreatedOnString)" />
         <RadzenDataGridColumn Title="Status" Context="task">
             <Template>
-                <RadzenDropDown Change="@(_ => SaveChanges(nameof(Models.Task.Status)))" TValue="Status" Value=task.Status Data=@Statuses />
+                <RadzenDropDown Change="@(_ => SaveChanges(nameof(TaskTicket.Status)))" TValue="Status" Value=task.Status Data=@Statuses />
             </Template>
         </RadzenDataGridColumn>
     </RadzenDataGrid>
@@ -60,7 +61,7 @@
             if (hasProperty)
             {
                 var json = await javascript.InvokeAsync<string>("localStorage.getItem", TasksKeyword);
-                List<Models.Task> tasks = JsonSerializer.Deserialize<List<Models.Task>>(json) ?? [];
+                List<TaskTicket> tasks = JsonSerializer.Deserialize<List<TaskTicket>>(json) ?? [];
                 Tasks = SelectableTask.ConvertToSelectable(tasks);
             }
         }
