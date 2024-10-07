@@ -14,23 +14,23 @@
 
 @rendermode InteractiveServer
 
-<h3>Task Builder</h3>
+<h3>Create Task</h3>
 
 <RadzenStack Orientation="Orientation.Vertical">
     <RadzenLabel Component="TaskTitle" Text="Title" />
-    <RadzenTextBox Name="TaskTitle" Value="@Title" />
+    <RadzenTextBox Name="TaskTitle" Change=@(args => Title = args) />
 
     <RadzenLabel Component="TaskDescription" Text="Description" />
-    <RadzenTextArea Name="TaskDescription" Value="@Description" />
+    <RadzenTextArea Name="TaskDescription" Change=@(args => Description = args) />
 
     <RadzenLabel Component="TaskCreatedBy" Text="Created By" />
-    <RadzenTextBox Name="TaskCreatedBy" Value="@CreatedBy" />
+    <RadzenTextBox Name="TaskCreatedBy" Change=@(args => CreatedBy = args) />
 
     <RadzenLabel Component="TaskPriority" Text="Priority" />
-    <RadzenDropDown Name="TaskPriority" TValue="@Priority" Data="@Priorities" Value="@Priority" />
+    <RadzenDropDown Name="TaskPriority" TValue="@Priority" Data="@Priorities" Change=@(args => Priority = (Priority)args) Value=@Priority />
 
     <RadzenLabel Component="TaskStatus" Text="Status" />
-    <RadzenDropDown Name="TaskStatus" TValue="@Status" Data="@Statuses" Value="@Status" />
+    <RadzenDropDown Name="TaskStatus" TValue="@Status" Data="@Statuses" Change=@(args => Status = (Status)args) Value=@Status />
 
     <RadzenButton Click="@SaveChanges">@(TaskId == null ? "Save" : "Update")</RadzenButton>
 </RadzenStack>
@@ -47,11 +47,11 @@
     public int? TaskId { get; set; }
 
     // Task Property Values
-    public Priority Priority = Priority.Unassigned;
-    public string Title = string.Empty;
-    public string Description = string.Empty;
-    public string CreatedBy = string.Empty;
-    public Status Status = Status.NotStarted;
+    public Priority Priority { get; set; } = Priority.Unassigned;
+    public string Title { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string CreatedBy { get; set; } = string.Empty;
+    public Status Status { get; set; } = Status.NotStarted;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -79,17 +79,18 @@
 
     public bool Validate()
     {
+        bool valid = true;
         if (string.IsNullOrWhiteSpace(Title))
         {
             notificationService.Notify(NotificationSeverity.Warning, "Invalid Title", "Please enter a Title.", 5000);
-            return false;
+            valid = false;
         }
         if (Priority == Priority.Unassigned)
         {
             notificationService.Notify(NotificationSeverity.Warning, "Invalid Priority", "Please assign a Priority.", 5000);
-            return false;
+            valid = false;
         }
-        return true;
+        return valid;
     }
 
     public async Task SaveChanges()
