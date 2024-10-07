@@ -6,7 +6,8 @@
 @attribute [StreamRendering]
 
 @inject NavigationManager navigation
-@inject NotificationService notificationService
+@inject NotificationService notification
+@inject TooltipService tooltip
 @inject IJSRuntime javascript
 
 @page "/task"
@@ -17,19 +18,19 @@
 <h3>Create Task</h3>
 
 <RadzenStack Orientation="Orientation.Vertical">
-    <RadzenLabel Component="TaskTitle" Text="Title" />
+    <RadzenLabel Component="TaskTitle" Text="Title" MouseEnter="@(args => OnHover(args, "Display name of the task"))"/>
     <RadzenTextBox Name="TaskTitle" Change=@(args => Title = args) />
 
-    <RadzenLabel Component="TaskDescription" Text="Description" />
+    <RadzenLabel Component="TaskDescription" Text="Description" MouseEnter="@(args => OnHover(args, "Information and details of the task"))" />
     <RadzenTextArea Name="TaskDescription" Change=@(args => Description = args) />
 
-    <RadzenLabel Component="TaskCreatedBy" Text="Created By" />
+    <RadzenLabel Component="TaskCreatedBy" Text="Created By" MouseEnter="@(args => OnHover(args, "Name of the user who is creating the task"))" />
     <RadzenTextBox Name="TaskCreatedBy" Change=@(args => CreatedBy = args) />
 
-    <RadzenLabel Component="TaskPriority" Text="Priority" />
+    <RadzenLabel Component="TaskPriority" Text="Priority" MouseEnter="@(args => OnHover(args, "Relative importance of the task"))" />
     <RadzenDropDown Name="TaskPriority" TValue="@Priority" Data="@Priorities" Change=@(args => Priority = (Priority)args) Value=@Priority />
 
-    <RadzenLabel Component="TaskStatus" Text="Status" />
+    <RadzenLabel Component="TaskStatus" Text="Status" MouseEnter="@(args => OnHover(args, "Current work progress label for the task"))" />
     <RadzenDropDown Name="TaskStatus" TValue="@Status" Data="@Statuses" Change=@(args => Status = (Status)args) Value=@Status />
 
     <RadzenButton Click="@SaveChanges">@(TaskId == null ? "Save" : "Update")</RadzenButton>
@@ -82,12 +83,12 @@
         bool valid = true;
         if (string.IsNullOrWhiteSpace(Title))
         {
-            notificationService.Notify(NotificationSeverity.Warning, "Invalid Title", "Please enter a Title.", 5000);
+            notification.Notify(NotificationSeverity.Warning, "Invalid Title", "Please enter a Title.", 5000);
             valid = false;
         }
         if (Priority == Priority.Unassigned)
         {
-            notificationService.Notify(NotificationSeverity.Warning, "Invalid Priority", "Please assign a Priority.", 5000);
+            notification.Notify(NotificationSeverity.Warning, "Invalid Priority", "Please assign a Priority.", 5000);
             valid = false;
         }
         return valid;
@@ -137,14 +138,16 @@
             var json = JsonSerializer.Serialize(Tasks);
             await javascript.InvokeVoidAsync("localStorage.setItem", TasksKeyword, json);
 
-            notificationService.Notify(NotificationSeverity.Success, "Task Saved", $"Task \"{Title}\" has been saved successfully.");
+            notification.Notify(NotificationSeverity.Success, "Task Saved", $"Task \"{Title}\" has been saved successfully.");
 
             navigation.NavigateTo("/");
         }
         catch (Exception ex)
         {
-            notificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to save task. Error message: {ex.Message}");
+            notification.Notify(NotificationSeverity.Error, "Error", $"Failed to save task. Error message: {ex.Message}");
         }
 
     }
+
+    public void OnHover(ElementReference element, string text) => tooltip.Open(element, text, new TooltipOptions() { Duration = 5000 });
 }
