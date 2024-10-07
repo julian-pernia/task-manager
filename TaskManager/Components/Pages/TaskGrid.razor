@@ -17,8 +17,8 @@
 
 <h3>Tasks</h3>
 
-<RadzenPanel>
-    <RadzenDataGrid TItem="SelectableTask" Data="Tasks" AllowColumnResize="true" GridLines="DataGridGridLines.Vertical">
+<RadzenStack Orientation="Orientation.Vertical">
+    <RadzenDataGrid TItem="SelectableTask" Data="Tasks" AllowColumnResize="true" AllowSorting="true" GridLines="DataGridGridLines.Vertical">
         <Columns>
             <RadzenDataGridColumn Title="" Context="task" Filterable="false" Sortable="false" Width="50px">
                 <Template>
@@ -26,31 +26,40 @@
                 </Template>
             </RadzenDataGridColumn>
 
-            <RadzenDataGridColumn Title="Task ID" Property="@nameof(SelectableTask.Id)" />
-
-            <RadzenDataGridColumn Title="Priority" Context="task">
+            <RadzenDataGridColumn Title="Actions" Context="task" Filterable="false" Sortable="false" Width="250px">
                 <Template>
-                    <RadzenDropDown Change="@(args => SetPriority((Priority)args, task))" TValue="Priority" Value=task.Priority Data=@Priorities Style="width:100%"/>
+                    <RadzenButton ButtonStyle="ButtonStyle.Secondary" Click="@(_ => EditTask(task.Id))" Style="width:50%">Edit</RadzenButton>
+                    <RadzenButton ButtonStyle="ButtonStyle.Danger" Click="@(_ => DeleteTask(task.Id))" Style="width:50%">Delete</RadzenButton>
                 </Template>
             </RadzenDataGridColumn>
 
-            <RadzenDataGridColumn Title="Title" Property="@nameof(SelectableTask.Title)" />
-            <RadzenDataGridColumn Title="Description" Property="@nameof(SelectableTask.Description)" />
-            <RadzenDataGridColumn Title="Created By" Property="@nameof(SelectableTask.CreatedBy)" />
-            <RadzenDataGridColumn Title="Created On" Property="@nameof(SelectableTask.CreatedOnString)" />
+            <RadzenDataGridColumn Title="Task ID" Property="@nameof(SelectableTask.Id)" Width="100px" MinWidth="100px"/>
 
-            <RadzenDataGridColumn Title="Status" Context="task">
+            <RadzenDataGridColumn Title="Priority" Context="task" MinWidth="200px" SortProperty="@nameof(SelectableTask.Priority)">
                 <Template>
-                    <RadzenDropDown Change="@(args => SetStatus((Status)args, task))" TValue="Status" Value=task.Status Data=@Statuses Style="width:100%"/>
+                    <RadzenDropDown Change="@(args => SetPriority((Priority)args, task))" TValue="Priority" Value=task.Priority Data=@Priorities Style="width:100%" />
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn Title="Title" Property="@nameof(SelectableTask.Title)" MinWidth="100px" />
+            <RadzenDataGridColumn Title="Description" Property="@nameof(SelectableTask.Description)" MinWidth="100px" />
+            <RadzenDataGridColumn Title="Created By" Property="@nameof(SelectableTask.CreatedBy)" MinWidth="100px" />
+            <RadzenDataGridColumn Title="Created On" Property="@nameof(SelectableTask.CreatedOnString)" SortProperty="@nameof(SelectableTask.CreatedOn)" MinWidth="100px" />
+
+            <RadzenDataGridColumn Title="Status" Context="task" MinWidth="300px" SortProperty="@nameof(SelectableTask.Status)">
+                <Template>
+                    <RadzenDropDown Change="@(args => SetStatus((Status)args, task))" TValue="Status" Value=task.Status Data=@Statuses Style="width:100%" />
                 </Template>
             </RadzenDataGridColumn>
         </Columns>
     </RadzenDataGrid>
+
     <RadzenStack Orientation="Orientation.Horizontal">
-        <RadzenButton ButtonType="@ButtonType.Button" Click="@CreateTask">Add Task</RadzenButton>
-        <RadzenButton ButtonType="@ButtonType.Button" Click="@DeleteTasks">Delete Tasks</RadzenButton>
+        <RadzenButton ButtonStyle="ButtonStyle.Primary" Click="@CreateTask">Create Task</RadzenButton>
+        <RadzenButton ButtonStyle="ButtonStyle.Danger" Click="@DeleteTasks">Delete Tasks</RadzenButton>
     </RadzenStack>
-</RadzenPanel>
+</RadzenStack>
+
 
 
 @code {
@@ -101,9 +110,10 @@
 
     public async Task SaveChanges()
     {
+        Tasks = new(Tasks); // Assign new value to get datagrid to refresh
         var json = JsonSerializer.Serialize(Tasks);
         await javascript.InvokeVoidAsync("localStorage.setItem", TasksKeyword, json);
-
+        StateHasChanged();
     }
 
     public void CreateTask()
@@ -111,10 +121,30 @@
         navigation.NavigateTo("/task");
     }
 
+    public void EditTask(int taskId)
+    {
+        navigation.NavigateTo($"/task/{taskId}");
+    }
+
+    public async Task DeleteTask(int taskId)
+    {
+        SelectableTask deleting = Tasks.First(task => task.Id == taskId);
+        bool? response = await dialog.Confirm($"Are you sure you want to delete \"{deleting.Title}\" (Task ID {taskId})? This cannot be undone.", "Delete Tasks");
+
+        if (response.HasValue && response.Value)
+        {
+            Tasks.Remove(deleting);
+
+            await SaveChanges();
+            notification.Notify(NotificationSeverity.Success, "Task Deleted", $"Task has been deleted.", 3000);
+        }
+    }
+
     public async Task DeleteTasks()
     {
         if (!Tasks.Any(task => task.IsSelected))
         {
+            notification.Notify(NotificationSeverity.Info, "No Tasks Selected", $"Click the checkbox on the left side of the task grid to use the bulk delete feature.", 5000);
             return;
         }
 
@@ -123,11 +153,9 @@
         if (response.HasValue && response.Value)
         {
             Tasks.RemoveAll(task => task.IsSelected);
-            Tasks = new(Tasks); // Assign new value to get datagrid to refresh
 
             await SaveChanges();
             notification.Notify(NotificationSeverity.Success, "Tasks Deleted", $"Tasks have been deleted.", 3000);
-            StateHasChanged();
         }
     }
 }

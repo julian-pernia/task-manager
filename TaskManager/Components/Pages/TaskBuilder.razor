@@ -11,21 +11,21 @@
 @inject IJSRuntime javascript
 
 @page "/task"
-@page "/task/{TaskId}"
+@page "/task/{TaskId:int}"
 
 @rendermode InteractiveServer
 
 <h3>Create Task</h3>
 
-<RadzenStack Orientation="Orientation.Vertical">
+<RadzenStack Orientation="Orientation.Vertical" Style="max-width:80%">
     <RadzenLabel Component="TaskTitle" Text="Title" MouseEnter="@(args => OnHover(args, "Display name of the task"))"/>
-    <RadzenTextBox Name="TaskTitle" Change=@(args => Title = args) />
+    <RadzenTextBox Name="TaskTitle" Change=@(args => Title = args) Value="@Title"/>
 
     <RadzenLabel Component="TaskDescription" Text="Description" MouseEnter="@(args => OnHover(args, "Information and details of the task"))" />
-    <RadzenTextArea Name="TaskDescription" Change=@(args => Description = args) />
+    <RadzenTextArea Name="TaskDescription" Change=@(args => Description = args) Value="@Description"/>
 
     <RadzenLabel Component="TaskCreatedBy" Text="Created By" MouseEnter="@(args => OnHover(args, "Name of the user who is creating the task"))" />
-    <RadzenTextBox Name="TaskCreatedBy" Change=@(args => CreatedBy = args) />
+    <RadzenTextBox Name="TaskCreatedBy" Change=@(args => CreatedBy = args) Value="@CreatedBy" Disabled="@(TaskId != null)"/>
 
     <RadzenLabel Component="TaskPriority" Text="Priority" MouseEnter="@(args => OnHover(args, "Relative importance of the task"))" />
     <RadzenDropDown Name="TaskPriority" TValue="@Priority" Data="@Priorities" Change=@(args => Priority = (Priority)args) Value=@Priority />
@@ -74,6 +74,9 @@
                 Title = existing.Title;
                 Description = existing.Description;
                 CreatedBy = existing.CreatedBy;
+                Status = existing.Status;
+
+                StateHasChanged();
             }
         }
     }
