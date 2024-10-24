@@ -11,6 +11,15 @@
 5. Navigate to this port in your browser
 6. Any data creation is applied to `localStorage`
 
+### Alternatively, to debug the project:
+
+1. Clone the project with GitHub
+2. Open the solution `TaskManager/TaskManager.sln` in Visual Studio
+3. Build the solution
+4. Run the `TaskManager` project in debug mode
+5. A web page should open in your browser
+6. Any data creation is applied to `localStorage`
+
 ### Once the project is running and opened in your browser, you can try a variety of features:
 
 1. View all tasks in main page Task grid
